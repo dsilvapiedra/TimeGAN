@@ -80,7 +80,7 @@ def main(args):
     # Load and preprocess data for model
     #########################
 
-    data_path = "TimeGAN/data/stock.csv"
+    data_path = f"TimeGAN/data/{args.dataset}"
     X, T, _, args.max_seq_len, args.padding_value = data_preprocess(
         data_path, args.max_seq_len
     )
@@ -240,7 +240,10 @@ if __name__ == "__main__":
         '--train_rate',
         default=0.5,
         type=float)
-
+    parser.add_argument(
+        '--dataset',
+        default="dataset.csv",
+        type=str)
     # Model Arguments
     parser.add_argument(
         '--emb_epochs',
