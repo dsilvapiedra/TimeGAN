@@ -34,7 +34,8 @@ def main(args):
         raise ValueError(f"Code directory not found at {code_dir}.")
 
     ## Data directory
-    data_path = os.path.abspath("TimeGAN/data")
+    #data_path = os.path.abspath("TimeGAN/data")
+    data_path = os.path.abspath("data")
     if not os.path.exists(data_path):
         raise ValueError(f"Data file not found at {data_path}.")
     data_dir = os.path.dirname(data_path)
@@ -80,7 +81,8 @@ def main(args):
     # Load and preprocess data for model
     #########################
 
-    data_path = f"TimeGAN/data/{args.dataset}"
+    #data_path = f"TimeGAN/data/{args.dataset}"
+    data_path = f"data/{args.dataset}"
     X, T, _, args.max_seq_len, args.padding_value = data_preprocess(
         data_path, args.max_seq_len
     )
@@ -212,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '--device',
         choices=['cuda', 'cpu'],
-        default='cuda',
+        default='cpu',
         type=str)
     parser.add_argument(
         '--exp',
@@ -234,7 +236,7 @@ if __name__ == "__main__":
     # Data Arguments
     parser.add_argument(
         '--max_seq_len',
-        default=100,
+        default=288, # 24 horas × 60 minutos / 5 minutos
         type=int)
     parser.add_argument(
         '--train_rate',

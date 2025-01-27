@@ -63,8 +63,11 @@ def feature_prediction(train_data, test_data, index):
     args["bidirectional"] = False
     args["epochs"] = 20
     args["batch_size"] = 128
-    args["in_dim"] = dim-1
-    args["h_dim"] = dim-1
+    if dim > 1:
+        args["in_dim"] = dim-1
+        args["h_dim"] = dim-1
+    else:
+        args["in_dim"], args["h_dim"] = 1, 1
     args["out_dim"] = 1
     args["n_layers"] = 3
     args["dropout"] = 0.5

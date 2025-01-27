@@ -32,146 +32,122 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 def data_preprocess(
     file_name: str, 
     max_seq_len: int, 
-    padding_value: float=-1.0,
-    impute_method: str="mode", 
-    scaling_method: str="minmax", 
+    padding_value: float = -1.0, 
+    impute_method: str = "interpolation", 
+    scaling_method: str = "minmax"
 ) -> Tuple[np.ndarray, np.ndarray, List]:
-    """Load the data and preprocess into 3d numpy array.
+    """Load and preprocess the dataset for time-series analysis.
     Preprocessing includes:
-    1. Remove outliers
-    2. Extract sequence length for each patient id
-    3. Impute missing data 
-    4. Normalize data
-    6. Sort dataset according to sequence length
+    1. Remove outliers: Detect and remove outliers in the "level" column using z-scores.
+    2. Impute missing data: Fill missing values in the "level" column using the specified imputation method ("median" or "mode").
+    3. Normalize data: Apply normalization to the "level" column using the specified scaling method ("minmax" or "standard").
+    4. Pad sequences: Pad the time series data to a fixed length (max_seq_len) using a specified padding value.
+    5. Extract sequence length: Calculate and store the actual length of each time series before padding.
 
     Args:
-    - file_name (str): CSV file name
-    - max_seq_len (int): maximum sequence length
-    - impute_method (str): The imputation method ("median" or "mode") 
-    - scaling_method (str): The scaler method ("standard" or "minmax")
+    - file_name (str): Path to the CSV file containing the data.
+    - max_seq_len (int): Maximum sequence length for time-series.
+    - padding_value (float): Value used for padding sequences.
+    - impute_method (str): Imputation method ("median" or "mode").
+    - scaling_method (str): Scaling method ("standard" or "minmax").
 
     Returns:
-    - processed_data: preprocessed data
-    - time: ndarray of ints indicating the length for each data
-    - params: the parameters to rescale the data 
+    - processed_data (np.ndarray): Preprocessed 3D array of shape [num_samples, max_seq_len, 1].
+    - time (np.ndarray): Array of sequence lengths for each sample.
+    - params (List): Parameters used for scaling.
     """
-
-    #########################
     # Load data
-    #########################
+    print("Loading data...")
+    ori_data = pd.read_csv(file_name, parse_dates=["datetime"])
 
-    index = 'Idx'
+    # Ensure data is sorted by datetime
+    ori_data = ori_data.sort_values(by="datetime").reset_index(drop=True)
 
-    # Load csv
-    print("Loading data...\n")
-    ori_data = pd.read_csv(file_name)
+    # Remove outliers (z-score > 3)
+    print("Removing outliers...")
+    no = len(ori_data)
+    z_scores = stats.zscore(ori_data["level"], nan_policy="omit")
+    ori_data = ori_data[np.abs(z_scores) < 3]
+    print(f"Dropped {no - len(ori_data)} rows (outliers)")
 
-    # Remove spurious column, so that column 0 is now 'admissionid'.
-    if ori_data.columns[0] == "Unnamed: 0":  
-        ori_data = ori_data.drop(["Unnamed: 0"], axis=1)
-
-    #########################
-    # Remove outliers from dataset
-    #########################
-    
-    no = ori_data.shape[0]
-    z_scores = stats.zscore(ori_data, axis=0, nan_policy='omit')
-    z_filter = np.nanmax(np.abs(z_scores), axis=1) < 3
-    ori_data = ori_data[z_filter]
-    print(f"Dropped {no - ori_data.shape[0]} rows (outliers)\n")
-
-    # Parameters
-    uniq_id = np.unique(ori_data[index])
-    no = len(uniq_id)
-    dim = len(ori_data.columns) - 1
-
-    #########################
-    # Impute, scale and pad data
-    #########################
-    
-    # Initialize scaler
-    if scaling_method == "minmax":
-        scaler = MinMaxScaler()
-        scaler.fit(ori_data)
-        params = [scaler.data_min_, scaler.data_max_]
-    
-    elif scaling_method == "standard":
-        scaler = StandardScaler()
-        scaler.fit(ori_data)
-        params = [scaler.mean_, scaler.var_]
-
-    # Imputation values
+    # Impute missing data
+    print("Imputing missing data...")
+    impute_vals = None
     if impute_method == "median":
-        impute_vals = ori_data.median()
+        impute_vals = [ori_data["level"].median()]
     elif impute_method == "mode":
-        impute_vals = stats.mode(ori_data).mode[0]
+        impute_vals = [stats.mode(ori_data["level"]).mode[0]]
+    elif impute_method == "interpolation":
+        impute_vals = [np.nan]  # No specific value, interpolation is used
     else:
-        raise ValueError("Imputation method should be `median` or `mode`")    
+        raise ValueError("Imputation method should be 'interpolation', 'median', or 'mode'")
 
-    # TODO: Sanity check for padding value
-    # if np.any(ori_data == padding_value):
-    #     print(f"Padding value `{padding_value}` found in data")
-    #     padding_value = np.nanmin(ori_data.to_numpy()) - 1
-    #     print(f"Changed padding value to: {padding_value}\n")
+    # Use imputer function for imputations
+    ori_data["level"] = imputer(
+        curr_data=ori_data["level"].to_numpy().reshape(-1, 1),
+        impute_vals=impute_vals,
+        zero_fill=False
+    ).ravel()
+
+    # Check for remaining missing values
+    if ori_data["level"].isnull().any():
+        raise ValueError("NaN values remain after imputation")
     
-    # Output initialization
-    output = np.empty([no, max_seq_len, dim])  # Shape:[no, max_seq_len, dim]
-    output.fill(padding_value)
+    # Normalize data
+    print("Scaling data...")
+    scaler = MinMaxScaler() if scaling_method == "minmax" else StandardScaler()
+    ori_data["level"] = scaler.fit_transform(ori_data[["level"]])
+    params = {
+        "scaler": "minmax" if scaling_method == "minmax" else "standard",
+        "min": scaler.data_min_.item(),
+        "max": scaler.data_max_.item(),
+    } if scaling_method == "minmax" else {
+        "mean": scaler.mean_.item(),
+        "var": scaler.var_.item(),
+    }
+
+    # Initialize output arrays
+    print("Preprocessing sequences...")
+    num_samples = len(ori_data) // max_seq_len
+    processed_data = np.full((num_samples, max_seq_len, 1), padding_value)
     time = []
 
-    # For each uniq id
-    for i in tqdm(range(no)):
-        # Extract the time-series data with a certain admissionid
+    for i in tqdm(range(num_samples)):
+        # Extract sequences
+        start_idx = i * max_seq_len
+        end_idx = start_idx + max_seq_len
+        seq = ori_data.iloc[start_idx:end_idx]["level"].to_numpy()
 
-        curr_data = ori_data[ori_data[index] == uniq_id[i]].to_numpy()
+        # Assign sequence to output
+        processed_data[i, :len(seq), 0] = seq
+        time.append(len(seq))
 
-        # Impute missing data
-        curr_data = imputer(curr_data, impute_vals)
+    return processed_data, np.array(time), params, max_seq_len,  padding_value
 
-        # Normalize data
-        curr_data = scaler.transform(curr_data)
-        
-        # Extract time and assign to the preprocessed data (Excluding ID)
-        curr_no = len(curr_data)
-
-        # Pad data to `max_seq_len`
-        if curr_no >= max_seq_len:
-            output[i, :, :] = curr_data[:max_seq_len, 1:]  # Shape: [1, max_seq_len, dim]
-            time.append(max_seq_len)
-        else:
-            output[i, :curr_no, :] = curr_data[:, 1:]  # Shape: [1, max_seq_len, dim]
-            time.append(curr_no)
-
-    return output, time, params, max_seq_len, padding_value
 
 def imputer(
     curr_data: np.ndarray, 
     impute_vals: List, 
-    zero_fill: bool = True
+    zero_fill: bool = False
 ) -> np.ndarray:
-    """Impute missing data given values for each columns.
-
-    Args:
-        curr_data (np.ndarray): Data before imputation.
-        impute_vals (list): Values to be filled for each column.
-        zero_fill (bool, optional): Whather to Fill with zeros the cases where 
-            impute_val is nan. Defaults to True.
-
-    Returns:
-        np.ndarray: Imputed data.
-    """
-
-    curr_data = pd.DataFrame(data=curr_data)
-    impute_vals = pd.Series(impute_vals)
+    """Improved imputer for time-series water level data."""
     
-    # Impute data
+    curr_data = pd.DataFrame(data=curr_data)
+    
+    # Imputation with provided values for each column
+    impute_vals = pd.Series(impute_vals)
     imputed_data = curr_data.fillna(impute_vals)
 
-    # Zero-fill, in case the `impute_vals` for a particular feature is `nan`.
-    imputed_data = imputed_data.fillna(0.0)
+    # Interpolation for missing values
+    imputed_data = imputed_data.interpolate(method='linear', limit_direction='both')
 
-    # Check for any N/A values
+    # Zero-fill only if explicitly required
+    if zero_fill:
+        imputed_data = imputed_data.fillna(0.0)
+
+    # Check for any remaining NaN values
     if imputed_data.isnull().any().any():
         raise ValueError("NaN values remain after imputation")
 
     return imputed_data.to_numpy()
+
