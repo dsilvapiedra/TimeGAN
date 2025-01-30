@@ -34,8 +34,12 @@ def main(args):
         raise ValueError(f"Code directory not found at {code_dir}.")
 
     ## Data directory
-    #data_path = os.path.abspath("TimeGAN/data")
-    data_path = os.path.abspath("data")
+    if args.data_path:
+        data_path = args.data_path
+    else:
+        data_path = os.path.abspath("data")
+        #data_path = os.path.abspath("TimeGAN/data")
+    
     if not os.path.exists(data_path):
         raise ValueError(f"Data file not found at {data_path}.")
     data_dir = os.path.dirname(data_path)
@@ -246,6 +250,10 @@ if __name__ == "__main__":
         '--dataset',
         default="dataset.csv",
         type=str)
+    parser.add_argument(
+        '--data_path',
+        type=str)
+    
     # Model Arguments
     parser.add_argument(
         '--emb_epochs',
