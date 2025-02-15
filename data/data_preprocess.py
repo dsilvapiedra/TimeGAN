@@ -65,8 +65,16 @@ def data_preprocess(
     print("Loading data...\n")
     ori_data = pd.read_csv(file_name)
 
+    
+    # Convertir la columna 'datetime' a tipo datetime
+    ori_data["datetime"] = pd.to_datetime(ori_data["datetime"], errors='coerce')
+
+    # Verificar si hay valores no convertidos (NaT)
+    if ori_data["datetime"].isna().any():
+        print("Advertencia: Algunas filas tienen valores inválidos en 'datetime'.")
+
     # Creo indice y dropeo timestamps
-    ori_data[index] = ori_data.index
+    ori_data[index] = ori_data["datetime"].dt.strftime("%Y%m%d").astype(int)
     ori_data = ori_data.drop(["datetime"], axis=1)
 
     # Remove spurious column, so that column 0 is now 'admissionid'.
@@ -164,6 +172,16 @@ def data_preprocess(
         else:
             output[i, :curr_no, :] = curr_data[:, 1:]  # Shape: [1, max_seq_len, dim]
             time.append(curr_no)
+    import matplotlib.pyplot as plt
+
+    # Visualizar la distribución de los datos escalados
+    plt.figure(figsize=(10, 6))
+    plt.boxplot(output[20, :,:], vert=False, patch_artist=True)
+    plt.title(f'Distribución de datos escalados para ID {uniq_id[i]}')
+    plt.xlabel('Valores escalados')
+    plt.show()
+
+
 
     return output, time, params, max_seq_len, padding_value
 
