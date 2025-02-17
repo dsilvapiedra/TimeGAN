@@ -81,6 +81,9 @@ def data_preprocess(
     if ori_data.columns[0] == "Unnamed: 0":  
         ori_data = ori_data.drop(["Unnamed: 0"], axis=1)
 
+    # Index to 0 column
+    first_column = ori_data.pop(index) 
+    ori_data.insert(0, index, first_column) 
     #########################
     # Remove outliers from dataset
     #########################
@@ -135,7 +138,7 @@ def data_preprocess(
     if impute_method == "median":
         impute_vals = ori_data.median()
     elif impute_method == "mode":
-        impute_vals = stats.mode(ori_data).mode[0]
+        impute_vals = stats.mode(ori_data).mode[1]
     else:
         raise ValueError("Imputation method should be `median` or `mode`")    
 
@@ -146,6 +149,7 @@ def data_preprocess(
     #     print(f"Changed padding value to: {padding_value}\n")
     
     # Output initialization
+    padding_value = impute_vals
     output = np.empty([no, max_seq_len, dim])  # Shape:[no, max_seq_len, dim]
     output.fill(padding_value)
     time = []
@@ -172,17 +176,6 @@ def data_preprocess(
         else:
             output[i, :curr_no, :] = curr_data[:, 1:]  # Shape: [1, max_seq_len, dim]
             time.append(curr_no)
-    import matplotlib.pyplot as plt
-
-    # Visualizar la distribución de los datos escalados
-    plt.figure(figsize=(10, 6))
-    plt.boxplot(output[20, :,:], vert=False, patch_artist=True)
-    plt.title(f'Distribución de datos escalados para ID {uniq_id[i]}')
-    plt.xlabel('Valores escalados')
-    plt.show()
-
-
-
     return output, time, params, max_seq_len, padding_value
 
 
