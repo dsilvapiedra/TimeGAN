@@ -81,12 +81,64 @@ def mat_to_csv(input_folder, output_csv, start_date, end_date, station_code):
     else:
         print("No se encontraron datos para las fechas proporcionadas.")
 
+def concatenar_csv(codigo_estacion, fecha_inicial, fecha_final, directorio):
+    # Convertir las fechas de entrada a objetos datetime
+    fecha_inicial = dt.datetime.strptime(fecha_inicial + " 00:00:00", "%Y%m%d %H:%M:%S")
+    fecha_final = dt.datetime.strptime(fecha_final + " 23:59:59", "%Y%m%d %H:%M:%S")
+
+    # Lista para almacenar los DataFrames
+    dfs = []
+
+    # Recorrer todos los archivos en el directorio
+    for archivo in os.listdir(directorio):
+        if archivo.endswith(".csv"):
+            # Extraer el código de la estación y las fechas del nombre del archivo
+            try:
+                partes = archivo.split("_")
+                codigo_archivo = partes[0]
+                fecha_inicio_archivo = dt.datetime.strptime(partes[1], "%d-%m-%Y")
+                fecha_fin_archivo = dt.datetime.strptime(partes[2].replace(".csv", ""), "%d-%m-%Y")
+            except (IndexError, ValueError):
+                # Si el archivo no tiene el formato correcto, se ignora
+                continue
+
+            # Verificar si el archivo corresponde al código de la estación y está dentro del rango de fechas
+            if (codigo_archivo == codigo_estacion and
+                fecha_inicio_archivo <= fecha_final and
+                fecha_fin_archivo >= fecha_inicial):
+
+                # Leer el archivo CSV
+                ruta_archivo = os.path.join(directorio, archivo)
+                df = pd.read_csv(ruta_archivo, parse_dates=['Fecha/Hora'])
+
+                # Filtrar por el rango de fechas
+                df_filtrado = df[(df['Fecha/Hora'] >= fecha_inicial) & (df['Fecha/Hora'] <= fecha_final)]
+
+                # Agregar el DataFrame filtrado a la lista
+                dfs.append(df_filtrado)
+
+    # Concatenar todos los DataFrames en uno solo
+    if dfs:
+        df_final = pd.concat(dfs, ignore_index=True)
+        # Guardar el DataFrame final en un nuevo archivo CSV
+        df_final.to_csv(f'{codigo_estacion}_concatenado.csv', index=False)
+        print(f"Archivo concatenado guardado como {codigo_estacion}_concatenado.csv")
+    else:
+        print("No se encontraron archivos que coincidan con los criterios.")
 
 # Ejemplo de uso
-in_dir = '../GANS/data/ANP/data/'
-start_dt = '20200301'
-end_dt = '20210301'
-st_code = 'MVD'
-out_csv = f"./{start_dt}_{end_dt}_{st_code}dataset.csv"
+codigo_estacion = "Muelle Fluvial"  # Código de la estación
+fecha_inicial = '20200301'
+fecha_final = '20210301'
+directorio = '../../../ANP/download/'
 
-mat_to_csv(in_dir, out_csv, start_dt, end_dt, st_code)
+concatenar_csv(codigo_estacion, fecha_inicial, fecha_final, directorio)
+
+# # Ejemplo de uso para .mats
+# in_dir = '../GANS/data/ANP/data/'
+# start_dt = '20200301'
+# end_dt = '20210301'
+# st_code = 'MVD'
+# out_csv = f"./{start_dt}_{end_dt}_{st_code}dataset.csv"
+
+# mat_to_csv(in_dir, out_csv, start_dt, end_dt, st_code)
