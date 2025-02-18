@@ -29,6 +29,32 @@ from tqdm import tqdm
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+# Function to trim the DataFrame between two dates
+def trim_dataframe(df, start_date, end_date):
+    """Trims a DataFrame to include only rows within a specified date range.
+
+    Args:
+        df: The input DataFrame with a 'datetime' column.
+        start_date: The start date of the range (inclusive).
+        end_date: The end date of the range (inclusive).
+
+    Returns:
+        A new DataFrame containing only the rows within the specified date range.
+        Returns the original DataFrame if invalid dates are provided.
+    """
+    try:
+        start_date = pd.to_datetime(start_date)
+        end_date = pd.to_datetime(end_date)
+    except ValueError:
+        print("Invalid date format. Please use a valid date format.")
+        return df  # Return original DataFrame if dates are invalid
+    # Display min and max of the 'datetime' column
+    print("Min Datetime:", df['datetime'].min())
+    print("Max Datetime:", df['datetime'].max())
+    trimmed_df = df[(df['datetime'] >= start_date) & (df['datetime'] <= end_date)]
+    return trimmed_df
+
+
 def data_preprocess(
     file_name: str, 
     max_seq_len: int, 
@@ -60,7 +86,10 @@ def data_preprocess(
     # Load data
     #########################
     index = 'Idx'
-
+    # Data period:
+    start_date = '2020-03-01'
+    end_date = '2021-03-01'
+    
     # Load csv
     print("Loading data...\n")
     ori_data = pd.read_csv(file_name)
@@ -69,6 +98,11 @@ def data_preprocess(
     # Convertir la columna 'datetime' a tipo datetime
     ori_data["datetime"] = pd.to_datetime(ori_data["datetime"], errors='coerce')
 
+    # Recortar al periodo deseado
+    ori_data = trim_dataframe(ori_data, start_date, end_date)
+
+    
+    
     # Verificar si hay valores no convertidos (NaT)
     if ori_data["datetime"].isna().any():
         print("Advertencia: Algunas filas tienen valores inválidos en 'datetime'.")
@@ -76,6 +110,10 @@ def data_preprocess(
     # Creo indice y dropeo timestamps
     ori_data[index] = ori_data["datetime"].dt.strftime("%Y%m%d").astype(int)
     ori_data = ori_data.drop(["datetime"], axis=1)
+    
+    # Drop Colonia por falta de datos
+    ori_data = ori_data.drop(["Col"], axis=1, errors='ignore')
+    print(ori_data.shape)
 
     # Remove spurious column, so that column 0 is now 'admissionid'.
     if ori_data.columns[0] == "Unnamed: 0":  
