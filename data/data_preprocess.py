@@ -29,6 +29,29 @@ from tqdm import tqdm
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
+def indexar_datos(ori_data, index, tipo_indexacion):
+    """
+    Indexa los datos según el tipo de indexación especificado.
+
+    Args:
+        ori_data (pd.DataFrame): DataFrame con la columna 'datetime'.
+        tipo_indexacion (str): 'dia', 'semana' o 'mes'.
+
+    Returns:
+        pd.DataFrame: DataFrame con la columna indexada.
+    """
+
+    if tipo_indexacion == 'dia':
+        ori_data[index] = ori_data['datetime'].dt.strftime('%Y%m%d').astype(int)
+    elif tipo_indexacion == 'semana':
+        ori_data[index] = ori_data['datetime'].dt.strftime('%Y%U').astype(int) #%U Semana del año (domingo como primer día de la semana)
+    elif tipo_indexacion == 'mes':
+        ori_data[index] = ori_data['datetime'].dt.strftime('%Y%m').astype(int)
+    else:
+        raise ValueError("Tipo de indexación no válido. Debe ser 'dia', 'semana' o 'mes'.")
+
+    return ori_data
+    
 # Function to trim the DataFrame between two dates
 def trim_dataframe(df, start_date, end_date):
     """Trims a DataFrame to include only rows within a specified date range.
@@ -108,7 +131,9 @@ def data_preprocess(
         print("Advertencia: Algunas filas tienen valores inválidos en 'datetime'.")
 
     # Creo indice y dropeo timestamps
-    ori_data[index] = ori_data["datetime"].dt.strftime("%Y%m%d").astype(int)
+    # Indexar por día
+    ori_data = indexar_datos(ori_data.copy(), index, 'dia')
+    print("Indexado por día:\n", ori_data)
     ori_data = ori_data.drop(["datetime"], axis=1)
     
     # Drop Colonia por falta de datos
@@ -187,7 +212,7 @@ def data_preprocess(
     #     print(f"Changed padding value to: {padding_value}\n")
     
     # Output initialization
-    padding_value = impute_vals
+    #padding_value = impute_vals
     output = np.empty([no, max_seq_len, dim])  # Shape:[no, max_seq_len, dim]
     output.fill(padding_value)
     time = []
