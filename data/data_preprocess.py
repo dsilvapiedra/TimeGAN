@@ -111,7 +111,7 @@ def data_preprocess(
     index = 'Idx'
     # Data period:
     start_date = '2020-03-01'
-    end_date = '2021-03-01'
+    end_date = '2024-03-01'
     
     # Load csv
     print("Loading data...\n")
@@ -132,10 +132,14 @@ def data_preprocess(
 
     # Creo indice y dropeo timestamps
     # Indexar por día
+    # Indexar por día
+    ori_data['datetime'] = pd.to_datetime(ori_data['datetime'])
+    ori_data = ori_data.groupby(pd.Grouper(key='datetime', freq='H')).first().reset_index()
+    print(ori_data.head())
     ori_data = indexar_datos(ori_data.copy(), index, 'dia')
     print("Indexado por día:\n", ori_data)
     ori_data = ori_data.drop(["datetime"], axis=1)
-    
+
     # Drop Colonia por falta de datos
     ori_data = ori_data.drop(["Col"], axis=1, errors='ignore')
     print(ori_data.shape)
@@ -201,7 +205,8 @@ def data_preprocess(
     if impute_method == "median":
         impute_vals = ori_data.median()
     elif impute_method == "mode":
-        impute_vals = stats.mode(ori_data).mode[1]
+        impute_arr = stats.mode(ori_data,axis=0, nan_policy='omit')
+        impute_vals = impute_arr.mode[1]
     else:
         raise ValueError("Imputation method should be `median` or `mode`")    
 
