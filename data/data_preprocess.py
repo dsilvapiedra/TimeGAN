@@ -29,28 +29,46 @@ from tqdm import tqdm
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-def indexar_datos(ori_data, index, tipo_indexacion):
+def indexar_datos(ori_data, index, tipo_indexacion, n=1):
     """
     Indexa los datos según el tipo de indexación especificado.
+    Además, permite dividir cada día en n partes y dropea filas de días con solo NaNs.
 
     Args:
         ori_data (pd.DataFrame): DataFrame con la columna 'datetime'.
+        index (str): Nombre de la columna de índice.
         tipo_indexacion (str): 'dia', 'semana' o 'mes'.
+        n (int): Número de subdivisiones por día (default=1, indexación por día completo).
 
     Returns:
-        pd.DataFrame: DataFrame con la columna indexada.
+        pd.DataFrame: DataFrame con la columna indexada y sin días completos con NaNs.
     """
 
+    # Convertir a datetime si no lo es
+    ori_data['datetime'] = pd.to_datetime(ori_data['datetime'])
+
+    # Eliminar días en los que todas las columnas son NaN
+    ori_data['dia'] = ori_data['datetime'].dt.strftime('%Y%m%d')  # Crear una columna auxiliar con el día
+    dias_validos = ori_data.groupby('dia').apply(lambda x: not x.drop(columns=['datetime', 'dia']).isna().all().all())
+    ori_data = ori_data[ori_data['dia'].isin(dias_validos[dias_validos].index)]  # Filtrar días válidos
+    ori_data = ori_data.drop(columns=['dia'])  # Eliminar la columna auxiliar
+
+    # Generar índices según el tipo de indexación
     if tipo_indexacion == 'dia':
         ori_data[index] = ori_data['datetime'].dt.strftime('%Y%m%d').astype(int)
     elif tipo_indexacion == 'semana':
-        ori_data[index] = ori_data['datetime'].dt.strftime('%Y%U').astype(int) #%U Semana del año (domingo como primer día de la semana)
+        ori_data[index] = ori_data['datetime'].dt.strftime('%Y%U').astype(int)  # %U: Semana del año (domingo como primer día)
     elif tipo_indexacion == 'mes':
         ori_data[index] = ori_data['datetime'].dt.strftime('%Y%m').astype(int)
     else:
         raise ValueError("Tipo de indexación no válido. Debe ser 'dia', 'semana' o 'mes'.")
 
-    return ori_data
+    # Dividir cada día en `n` partes (solo si tipo_indexacion es 'dia')
+    if tipo_indexacion == 'dia' and n > 1:
+        segmento = (ori_data['datetime'].dt.hour // (24 // n)).astype(str)
+        ori_data[index] = ori_data[index].astype(str) + segmento  # Convertir ambos a str antes de concatenar
+
+    return ori_data.drop(["datetime"], axis=1)
     
 # Function to trim the DataFrame between two dates
 def trim_dataframe(df, start_date, end_date):
@@ -131,14 +149,9 @@ def data_preprocess(
         print("Advertencia: Algunas filas tienen valores inválidos en 'datetime'.")
 
     # Creo indice y dropeo timestamps
-    # Indexar por día
-    # Indexar por día
-    ori_data['datetime'] = pd.to_datetime(ori_data['datetime'])
-    ori_data = ori_data.groupby(pd.Grouper(key='datetime', freq='H')).first().reset_index()
-    print(ori_data.head())
-    ori_data = indexar_datos(ori_data.copy(), index, 'dia')
+    # Indexar por día (n veces) y Eliminar días que constan solo de NaNs 
+    ori_data = indexar_datos(ori_data, index, 'dia', n=4)
     print("Indexado por día:\n", ori_data)
-    ori_data = ori_data.drop(["datetime"], axis=1)
 
     # Drop Colonia por falta de datos
     ori_data = ori_data.drop(["Col"], axis=1, errors='ignore')
@@ -250,7 +263,7 @@ def data_preprocess(
 def imputer(
     curr_data: np.ndarray, 
     impute_vals: List, 
-    zero_fill: bool = False
+    zero_fill: bool = True
 ) -> np.ndarray:
     """Improved imputer for time-series water level data."""
     
@@ -269,7 +282,12 @@ def imputer(
 
     # Check for any remaining NaN values
     if imputed_data.isnull().any().any():
-        raise ValueError("NaN values remain after imputation")
+        
+        imputed_data = imputed_data.interpolate(method='pad', limit_direction='forward')
+        if imputed_data.isnull().any().any():
+            imputed_data = imputed_data.interpolate(method='pad', limit_direction='forward')
+            if imputed_data.isnull().any().any():
+                raise ValueError("NaN values remain after imputation")
 
     return imputed_data.to_numpy()
 
