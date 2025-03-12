@@ -66,7 +66,7 @@ def indexar_datos(ori_data, index, tipo_indexacion, n=1):
     # Dividir cada día en `n` partes (solo si tipo_indexacion es 'dia')
     if tipo_indexacion == 'dia' and n > 1:
         segmento = (ori_data['datetime'].dt.hour // (24 // n)).astype(str)
-        ori_data[index] = ori_data[index].astype(str) + segmento  # Convertir ambos a str antes de concatenar
+        ori_data[index] = (ori_data[index].astype(str) + segmento).astype(int)
 
     return ori_data.drop(["datetime"], axis=1)
     
