@@ -69,7 +69,29 @@ def indexar_datos(ori_data, index, tipo_indexacion, n=1):
         ori_data[index] = (ori_data[index].astype(str) + segmento).astype(int)
 
     return ori_data.drop(["datetime"], axis=1)
-    
+
+def seleccionar_muestras(ori_data, index, m):
+    """
+    Selecciona `m` filas equiespaciadas dentro de cada grupo definido por `index`.
+
+    Args:
+        ori_data (pd.DataFrame): DataFrame con la columna `index`.
+        index (str): Nombre de la columna índice por la que se agrupa.
+        m (int): Número de filas deseadas por grupo.
+
+    Returns:
+        pd.DataFrame: DataFrame con `m` filas seleccionadas equiespaciadamente por cada valor de `index`.
+    """
+    def seleccionar_filas(grupo):
+        if len(grupo) <= m:
+            return grupo  # Si hay menos o igual a `m` filas, se devuelven todas
+        else:
+            indices = np.linspace(0, len(grupo) - 1, num=m, dtype=int)  # Índices equiespaciados
+            return grupo.iloc[indices]
+        
+    return ori_data.groupby(index, group_keys=False).apply(seleccionar_filas).reset_index(drop=True)
+
+     
 # Function to trim the DataFrame between two dates
 def trim_dataframe(df, start_date, end_date):
     """Trims a DataFrame to include only rows within a specified date range.
@@ -160,6 +182,8 @@ def data_preprocess(
     # Remove spurious column, so that column 0 is now 'admissionid'.
     if ori_data.columns[0] == "Unnamed: 0":  
         ori_data = ori_data.drop(["Unnamed: 0"], axis=1)
+
+    ori_data = seleccionar_muestras(ori_data, index, m=24)
 
     # Index to 0 column
     first_column = ori_data.pop(index) 
