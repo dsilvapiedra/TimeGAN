@@ -255,7 +255,7 @@ def timegan_generator(model, T, args):
 
     # Load arguments and model
     with open(f"{args.model_path}/args.pickle", "rb") as fb:
-        args = torch.load(fb)
+        args = torch.load(fb, weights_only=False)
     
     model.load_state_dict(torch.load(f"{args.model_path}/model.pt"))
     
