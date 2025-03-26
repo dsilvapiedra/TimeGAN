@@ -10,6 +10,7 @@ import time
 
 # 3rd-Party Modules
 import numpy as np
+import pandas as pd
 import torch
 import joblib
 from sklearn.model_selection import train_test_split
@@ -201,7 +202,7 @@ def main(args):
     df = pd.DataFrame({'feat_pred': feat_pred, 'step_ahead_pred': step_ahead_pred})
     
     # Save the DataFrame to a CSV file
-    df.to_csv('predictions.csv', index=False)
+    df.to_csv(out_dir + 'predictions.csv', index=False)
 
     return None
 
