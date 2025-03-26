@@ -197,6 +197,11 @@ def main(args):
           f'(2) New: {str(np.round(new_step_ahead_pred_perf, 4))}\n')
 
     print(f"Total Runtime: {(time.time() - start)/60} mins\n")
+    # Create a DataFrame to save preds
+    df = pd.DataFrame({'feat_pred': feat_pred, 'step_ahead_pred': step_ahead_pred})
+    
+    # Save the DataFrame to a CSV file
+    df.to_csv('predictions.csv', index=False)
 
     return None
 
